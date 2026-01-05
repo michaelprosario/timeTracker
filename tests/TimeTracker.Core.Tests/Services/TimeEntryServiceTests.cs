@@ -34,6 +34,12 @@ public class TimeEntryServiceTests
         _timeEntryService = new TimeEntryService(_unitOfWork);
     }
     
+    [TearDown]
+    public void TearDown()
+    {
+        _unitOfWork?.Dispose();
+    }
+    
     [Test]
     public async Task CreateTimeEntryAsync_WithValidData_ReturnsSuccess()
     {
@@ -94,6 +100,9 @@ public class TimeEntryServiceTests
             Status = TimeSheetStatus.Closed
         };
         
+        var project = new Project { Code = "PROJECT-A", Name = "Project A", IsActive = true };
+        var workType = new WorkType { Code = "DEV", Name = "Development", IsActive = true };
+        
         var command = new CreateTimeEntryCommand
         {
             TimeSheetId = timeSheetId,
@@ -105,6 +114,8 @@ public class TimeEntryServiceTests
         };
         
         _timeSheetRepository.GetByIdAsync(timeSheetId).Returns(timeSheet);
+        _projectRepository.GetByCodeAsync("PROJECT-A").Returns(project);
+        _workTypeRepository.GetByCodeAsync("DEV").Returns(workType);
         
         // Act
         var result = await _timeEntryService.CreateTimeEntryAsync(command);

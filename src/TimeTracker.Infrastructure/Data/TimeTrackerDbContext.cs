@@ -103,21 +103,23 @@ public class TimeTrackerDbContext : DbContext
     
     private void SeedData(ModelBuilder modelBuilder)
     {
+        var seedDate = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        
         // Seed Projects
         modelBuilder.Entity<Project>().HasData(
-            new Project { Code = "INTERNAL", Name = "Internal Tasks", Description = "Internal company tasks", IsActive = true, CreatedAt = DateTime.UtcNow },
-            new Project { Code = "TRAINING", Name = "Training & Development", Description = "Learning and training activities", IsActive = true, CreatedAt = DateTime.UtcNow },
-            new Project { Code = "PROJECT-A", Name = "Project Alpha", Description = "Main product development", IsActive = true, CreatedAt = DateTime.UtcNow }
+            new Project { Code = "INTERNAL", Name = "Internal Tasks", Description = "Internal company tasks", IsActive = true, CreatedAt = seedDate },
+            new Project { Code = "TRAINING", Name = "Training & Development", Description = "Learning and training activities", IsActive = true, CreatedAt = seedDate },
+            new Project { Code = "PROJECT-A", Name = "Project Alpha", Description = "Main product development", IsActive = true, CreatedAt = seedDate }
         );
         
         // Seed WorkTypes
         modelBuilder.Entity<WorkType>().HasData(
-            new WorkType { Code = "DEV", Name = "Development", Description = "Software development work", IsActive = true, CreatedAt = DateTime.UtcNow },
-            new WorkType { Code = "MEET", Name = "Meetings", Description = "Meetings and discussions", IsActive = true, CreatedAt = DateTime.UtcNow },
-            new WorkType { Code = "TEST", Name = "Testing", Description = "Quality assurance and testing", IsActive = true, CreatedAt = DateTime.UtcNow },
-            new WorkType { Code = "ADMIN", Name = "Administration", Description = "Administrative tasks", IsActive = true, CreatedAt = DateTime.UtcNow },
-            new WorkType { Code = "TRAIN", Name = "Training", Description = "Training and learning", IsActive = true, CreatedAt = DateTime.UtcNow },
-            new WorkType { Code = "SUPPORT", Name = "Support", Description = "Customer support", IsActive = true, CreatedAt = DateTime.UtcNow }
+            new WorkType { Code = "DEV", Name = "Development", Description = "Software development work", IsActive = true, CreatedAt = seedDate },
+            new WorkType { Code = "MEET", Name = "Meetings", Description = "Meetings and discussions", IsActive = true, CreatedAt = seedDate },
+            new WorkType { Code = "TEST", Name = "Testing", Description = "Quality assurance and testing", IsActive = true, CreatedAt = seedDate },
+            new WorkType { Code = "ADMIN", Name = "Administration", Description = "Administrative tasks", IsActive = true, CreatedAt = seedDate },
+            new WorkType { Code = "TRAIN", Name = "Training", Description = "Training and learning", IsActive = true, CreatedAt = seedDate },
+            new WorkType { Code = "SUPPORT", Name = "Support", Description = "Customer support", IsActive = true, CreatedAt = seedDate }
         );
     }
 }

@@ -23,6 +23,12 @@ public class UserServiceTests
         _userService = new UserService(_unitOfWork);
     }
     
+    [TearDown]
+    public void TearDown()
+    {
+        _unitOfWork?.Dispose();
+    }
+    
     [Test]
     public async Task RegisterUserAsync_WithValidData_ReturnsSuccess()
     {
