@@ -9,10 +9,9 @@ services:
     container_name: timetracker_web
     ports:
       - "5000:8080"
-      - "5001:8081"
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
-      - ASPNETCORE_URLS=http://+:8080;https://+:8081
+      - ASPNETCORE_URLS=http://+:8080
       - ConnectionStrings__DefaultConnection=Host=postgres;Port=5432;Database=timetracker;Username=postgres;Password=Foobar321
     networks:
       - postgres
