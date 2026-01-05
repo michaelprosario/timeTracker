@@ -1,0 +1,64 @@
+@model TimeTracker.Web.Models.TimeSheetListViewModel
+@{
+    ViewData["Title"] = "My Timesheets";
+}
+
+<div class="container mt-4">
+    <h1>My Timesheets</h1>
+    
+    @if (TempData["Success"] != null)
+    {
+        <div class="alert alert-success">@TempData["Success"]</div>
+    }
+    
+    @if (TempData["Error"] != null)
+    {
+        <div class="alert alert-danger">@TempData["Error"]</div>
+    }
+    
+    <div class="table-responsive">
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>Period</th>
+                    <th>Start Date</th>
+                    <th>End Date</th>
+                    <th>Total Hours</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var ts in Model.TimeSheets)
+                {
+                    <tr>
+                        <td>@ts.StartDate.ToString("MMM dd") - @ts.EndDate.ToString("MMM dd, yyyy")</td>
+                        <td>@ts.StartDate.ToShortDateString()</td>
+                        <td>@ts.EndDate.ToShortDateString()</td>
+                        <td>@ts.TotalHours.ToString("F2")</td>
+                        <td>
+                            @if (ts.Status == "Open")
+                            {
+                                <span class="badge bg-success">Open</span>
+                            }
+                            else
+                            {
+                                <span class="badge bg-secondary">Closed</span>
+                            }
+                        </td>
+                        <td>
+                            <a href="@Url.Action("Details", new { id = ts.Id })" class="btn btn-sm btn-primary">View Details</a>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+    
+    @if (!Model.TimeSheets.Any())
+    {
+        <div class="alert alert-info">
+            <p>No timesheets found. A new timesheet will be created automatically when you navigate to the current period.</p>
+        </div>
+    }
+</div>

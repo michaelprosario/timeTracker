@@ -1,0 +1,17 @@
+- System should enable users to register for account
+- System should enable users to login to system
+- User can manage time sheets every two weeks
+- User can manage time entries on time sheet
+- timeEntry
+    - id
+    - createdAt
+    - createdBy
+    - projectCode
+    - startTime
+    - endTime
+    - hours
+    - entryDate
+    - notes
+- No approvals are required.
+- Propose reports to help me understand my time utilization 
+- Think about domain requirements 003-Domain.md
