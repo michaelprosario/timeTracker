@@ -102,6 +102,6 @@ public class TimeSheetService
     private DateTime GetMondayOfWeek(DateTime date)
     {
         var daysFromMonday = ((int)date.DayOfWeek - 1 + 7) % 7;
-        return date.Date.AddDays(-daysFromMonday);
+        return DateTime.SpecifyKind(date.Date.AddDays(-daysFromMonday), DateTimeKind.Utc);
     }
 }

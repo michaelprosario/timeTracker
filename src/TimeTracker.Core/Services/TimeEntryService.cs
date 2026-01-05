@@ -48,10 +48,10 @@ public class TimeEntryService
             ProjectCode = command.ProjectCode.ToUpper(),
             WorkTypeCode = command.WorkTypeCode.ToUpper(),
             Hours = command.Hours,
-            EntryDate = command.EntryDate.Date,
+            EntryDate = DateTime.SpecifyKind(command.EntryDate.Date, DateTimeKind.Utc),
             Notes = command.Notes ?? string.Empty,
-            StartTime = command.StartTime,
-            EndTime = command.EndTime,
+            StartTime = command.StartTime.HasValue ? DateTime.SpecifyKind(command.StartTime.Value, DateTimeKind.Utc) : null,
+            EndTime = command.EndTime.HasValue ? DateTime.SpecifyKind(command.EndTime.Value, DateTimeKind.Utc) : null,
             LastModifiedAt = DateTime.UtcNow
         };
         
@@ -88,10 +88,10 @@ public class TimeEntryService
         timeEntry.ProjectCode = command.ProjectCode.ToUpper();
         timeEntry.WorkTypeCode = command.WorkTypeCode.ToUpper();
         timeEntry.Hours = command.Hours;
-        timeEntry.EntryDate = command.EntryDate.Date;
+        timeEntry.EntryDate = DateTime.SpecifyKind(command.EntryDate.Date, DateTimeKind.Utc);
         timeEntry.Notes = command.Notes ?? string.Empty;
-        timeEntry.StartTime = command.StartTime;
-        timeEntry.EndTime = command.EndTime;
+        timeEntry.StartTime = command.StartTime.HasValue ? DateTime.SpecifyKind(command.StartTime.Value, DateTimeKind.Utc) : null;
+        timeEntry.EndTime = command.EndTime.HasValue ? DateTime.SpecifyKind(command.EndTime.Value, DateTimeKind.Utc) : null;
         timeEntry.LastModifiedAt = DateTime.UtcNow;
         
         await _unitOfWork.TimeEntries.UpdateAsync(timeEntry);

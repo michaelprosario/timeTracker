@@ -17,6 +17,35 @@ public class TimeSheetController : BaseController
         _timeEntryService = timeEntryService;
     }
     
+    [HttpGet]
+    public async Task<IActionResult> Create()
+    {
+        var userId = GetCurrentUserId();
+        if (userId == Guid.Empty)
+        {
+            return RedirectToAction("Login", "Account");
+        }
+        
+        var command = new CreateOrGetTimeSheetCommand
+        {
+            UserId = userId,
+            ForDate = DateTime.UtcNow
+        };
+        
+        var result = await _timeSheetService.CreateOrGetTimeSheetAsync(command);
+        
+        if (result.Success)
+        {
+            TempData["Success"] = result.Messages.Any() ? result.Messages.First() : "Time sheet ready";
+            return RedirectToAction(nameof(Details), new { id = result.Data!.Id });
+        }
+        else
+        {
+            TempData["Error"] = string.Join(", ", result.Errors);
+            return RedirectToAction(nameof(Index));
+        }
+    }
+    
     public async Task<IActionResult> Index()
     {
         var userId = GetCurrentUserId();

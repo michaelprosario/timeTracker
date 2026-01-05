@@ -11,8 +11,20 @@ public class HomeController : BaseController
         var userId = GetCurrentUserId();
         if (userId != Guid.Empty)
         {
-            return RedirectToAction("Index", "TimeSheet");
+            return RedirectToAction("Dashboard");
         }
+        return View();
+    }
+
+    public IActionResult Dashboard()
+    {
+        var userId = GetCurrentUserId();
+        if (userId == Guid.Empty)
+        {
+            return RedirectToAction("Login", "Account");
+        }
+        
+        ViewData["UserName"] = GetCurrentUserName();
         return View();
     }
 

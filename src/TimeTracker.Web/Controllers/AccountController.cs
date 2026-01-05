@@ -98,7 +98,7 @@ public class AccountController : Controller
         HttpContext.Session.SetString("UserId", result.Data!.Id.ToString());
         HttpContext.Session.SetString("UserName", $"{result.Data.FirstName} {result.Data.LastName}");
         
-        return RedirectToAction("Index", "TimeSheet");
+        return RedirectToAction("Dashboard", "Home");
     }
     
     public IActionResult Logout()
