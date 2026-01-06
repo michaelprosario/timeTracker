@@ -168,6 +168,84 @@ public class TimeEntryService
         return AppResult<IEnumerable<WorkType>>.SuccessResult(workTypes);
     }
     
+    public async Task<AppResult<IEnumerable<ProjectTimeReportDto>>> GetProjectTimeReportAsync(GetProjectTimeReportQuery query)
+    {
+        // Get user's time sheets
+        var timeSheets = await _unitOfWork.TimeSheets.GetByUserIdAsync(query.UserId);
+        
+        // Filter by timesheet if specified
+        if (query.TimeSheetId.HasValue)
+        {
+            timeSheets = timeSheets.Where(ts => ts.Id == query.TimeSheetId.Value);
+        }
+        
+        // Filter by date range if specified
+        if (query.StartDate.HasValue)
+        {
+            timeSheets = timeSheets.Where(ts => ts.EndDate >= query.StartDate.Value);
+        }
+        
+        if (query.EndDate.HasValue)
+        {
+            timeSheets = timeSheets.Where(ts => ts.StartDate <= query.EndDate.Value);
+        }
+        
+        var reportData = new List<ProjectTimeReportDto>();
+        
+        foreach (var timeSheet in timeSheets.OrderByDescending(ts => ts.EndDate))
+        {
+            var timeEntries = await _unitOfWork.TimeEntries.GetByTimeSheetIdAsync(timeSheet.Id);
+            
+            // Group time entries by project
+            var projectGroups = timeEntries.GroupBy(te => te.ProjectCode);
+            
+            var projectSummaries = new List<ProjectTimeSummaryDto>();
+            
+            foreach (var projectGroup in projectGroups)
+            {
+                var project = await _unitOfWork.Projects.GetByCodeAsync(projectGroup.Key);
+                var projectName = project?.Name ?? projectGroup.Key;
+                
+                var timeEntryDetails = new List<TimeEntryDetailDto>();
+                
+                foreach (var entry in projectGroup.OrderBy(te => te.EntryDate))
+                {
+                    var workType = await _unitOfWork.WorkTypes.GetByCodeAsync(entry.WorkTypeCode);
+                    
+                    timeEntryDetails.Add(new TimeEntryDetailDto
+                    {
+                        Id = entry.Id,
+                        EntryDate = entry.EntryDate,
+                        Hours = entry.Hours,
+                        WorkTypeCode = entry.WorkTypeCode,
+                        WorkTypeName = workType?.Name ?? entry.WorkTypeCode,
+                        Notes = entry.Notes
+                    });
+                }
+                
+                projectSummaries.Add(new ProjectTimeSummaryDto
+                {
+                    ProjectCode = projectGroup.Key,
+                    ProjectName = projectName,
+                    TotalHours = projectGroup.Sum(te => te.Hours),
+                    TimeEntries = timeEntryDetails
+                });
+            }
+            
+            reportData.Add(new ProjectTimeReportDto
+            {
+                TimeSheetId = timeSheet.Id,
+                StartDate = timeSheet.StartDate,
+                EndDate = timeSheet.EndDate,
+                Status = timeSheet.Status.ToString(),
+                TotalHours = timeSheet.TotalHours,
+                Projects = projectSummaries.OrderBy(ps => ps.ProjectName).ToList()
+            });
+        }
+        
+        return AppResult<IEnumerable<ProjectTimeReportDto>>.SuccessResult(reportData);
+    }
+    
     private async Task<AppResult> ValidateTimeEntryAsync(CreateTimeEntryCommand command)
     {
         var errors = new Dictionary<string, List<string>>();

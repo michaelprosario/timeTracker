@@ -1,0 +1,2 @@
+- As a time entry user, I should have a report that enables me to see the time I use on each project for each time sheet.  Please make a report for this.
+- Think about the implementation in projectReporting.md
