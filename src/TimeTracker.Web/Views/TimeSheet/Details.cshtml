@@ -92,7 +92,7 @@
                 </h5>
             </div>
             <div class="card-body">
-                <form asp-action="CreateEntry" method="post">
+                <form asp-action="CreateEntry" method="post" id="createEntryForm">
                     <input type="hidden" name="timeSheetId" value="@Model.TimeSheet.Id" />
                     <input type="hidden" name="StartTime" id="startTimeHidden" />
                     <input type="hidden" name="EndTime" id="endTimeHidden" />
@@ -280,7 +280,7 @@
                     </h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
-                <form asp-action="UpdateEntry" asp-route-timeSheetId="@Model.TimeSheet.Id" method="post">
+                <form asp-action="UpdateEntry" asp-route-timeSheetId="@Model.TimeSheet.Id" method="post" id="editEntryForm">
                     <input type="hidden" name="Id" id="editEntryId" />
                     <input type="hidden" name="StartTime" id="editStartTimeHidden" />
                     <input type="hidden" name="EndTime" id="editEndTimeHidden" />
@@ -509,6 +509,17 @@
         document.getElementById('editStartTime').addEventListener('change', calculateEditHours);
         document.getElementById('editEndTime').addEventListener('change', calculateEditHours);
         document.getElementById('editEntryDate').addEventListener('change', updateEditStartEndTimeHidden);
+        
+        // Add form submission handlers to ensure hidden fields are updated
+        document.getElementById('createEntryForm').addEventListener('submit', function(e) {
+            updateStartEndTimeHidden();
+            calculateHours();
+        });
+        
+        document.getElementById('editEntryForm').addEventListener('submit', function(e) {
+            updateEditStartEndTimeHidden();
+            calculateEditHours();
+        });
         
         // Calculate on page load
         calculateHours();
