@@ -113,7 +113,9 @@ public class TimeSheetController : BaseController
                 WorkTypeCode = te.WorkTypeCode,
                 EntryDate = te.EntryDate,
                 Hours = te.Hours,
-                Notes = te.Notes
+                Notes = te.Notes,
+                StartTime = te.StartTime,
+                EndTime = te.EndTime
             }).ToList(),
             AvailableProjects = projectsResult.Data!.Select(p => new ProjectViewModel
             {
@@ -147,7 +149,9 @@ public class TimeSheetController : BaseController
             WorkTypeCode = model.WorkTypeCode,
             EntryDate = model.EntryDate,
             Hours = model.Hours,
-            Notes = model.Notes ?? string.Empty
+            Notes = model.Notes ?? string.Empty,
+            StartTime = model.StartTime,
+            EndTime = model.EndTime
         };
         
         var result = await _timeEntryService.CreateTimeEntryAsync(command);
@@ -155,6 +159,42 @@ public class TimeSheetController : BaseController
         if (result.Success)
         {
             TempData["Success"] = "Time entry added successfully";
+        }
+        else
+        {
+            TempData["Error"] = string.Join(", ", result.Errors);
+        }
+        
+        return RedirectToAction(nameof(Details), new { id = timeSheetId });
+    }
+    
+    [HttpPost]
+    public async Task<IActionResult> UpdateEntry(Guid timeSheetId, TimeEntryViewModel model)
+    {
+        var userId = GetCurrentUserId();
+        if (userId == Guid.Empty)
+        {
+            return RedirectToAction("Login", "Account");
+        }
+        
+        var command = new UpdateTimeEntryCommand
+        {
+            Id = model.Id,
+            UserId = userId,
+            ProjectCode = model.ProjectCode,
+            WorkTypeCode = model.WorkTypeCode,
+            EntryDate = model.EntryDate,
+            Hours = model.Hours,
+            Notes = model.Notes ?? string.Empty,
+            StartTime = model.StartTime,
+            EndTime = model.EndTime
+        };
+        
+        var result = await _timeEntryService.UpdateTimeEntryAsync(command);
+        
+        if (result.Success)
+        {
+            TempData["Success"] = "Time entry updated successfully";
         }
         else
         {

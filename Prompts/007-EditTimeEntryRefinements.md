@@ -1,0 +1,2 @@
+- Given I am reviewing time entries when the system list entries, the system should show start and end times
+- I should be able to edit an existing time entry

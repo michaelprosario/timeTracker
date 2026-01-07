@@ -30,6 +30,8 @@ public class TimeEntryViewModel
     public DateTime EntryDate { get; set; }
     public decimal Hours { get; set; }
     public string Notes { get; set; } = string.Empty;
+    public DateTime? StartTime { get; set; }
+    public DateTime? EndTime { get; set; }
 }
 
 public class ProjectViewModel

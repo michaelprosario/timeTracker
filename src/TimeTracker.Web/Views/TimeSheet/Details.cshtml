@@ -94,6 +94,8 @@
             <div class="card-body">
                 <form asp-action="CreateEntry" method="post">
                     <input type="hidden" name="timeSheetId" value="@Model.TimeSheet.Id" />
+                    <input type="hidden" name="StartTime" id="startTimeHidden" />
+                    <input type="hidden" name="EndTime" id="endTimeHidden" />
                     
                     <div class="row g-3">
                         <div class="col-md-3">
@@ -185,8 +187,9 @@
                                 <th>Date</th>
                                 <th>Project</th>
                                 <th>Work Type</th>
+                                <th>Start Time</th>
+                                <th>End Time</th>
                                 <th>Hours</th>
-                                <th>Notes</th>
                                 @if (Model.TimeSheet.Status == "Open")
                                 {
                                     <th>Actions</th>
@@ -196,7 +199,7 @@
                         <tbody>
                             @foreach (var entry in Model.TimeEntries.OrderBy(e => e.EntryDate))
                             {
-                                <tr>
+                                <tr id="entry-row-@entry.Id">
                                     <td>@entry.EntryDate.ToString("ddd, MMM dd")</td>
                                     <td>
                                         <span class="badge bg-info">@entry.ProjectCode</span>
@@ -204,11 +207,26 @@
                                     <td>
                                         <span class="badge bg-secondary">@entry.WorkTypeCode</span>
                                     </td>
+                                    <td>@(entry.StartTime.HasValue ? entry.StartTime.Value.ToString("HH:mm") : "-")</td>
+                                    <td>@(entry.EndTime.HasValue ? entry.EndTime.Value.ToString("HH:mm") : "-")</td>
                                     <td><strong>@entry.Hours.ToString("F2")</strong></td>
-                                    <td>@(string.IsNullOrEmpty(entry.Notes) ? "-" : entry.Notes)</td>
                                     @if (Model.TimeSheet.Status == "Open")
                                     {
                                         <td>
+                                            <button type="button" class="btn btn-sm btn-primary me-1 edit-entry-btn" 
+                                                    data-id="@entry.Id" 
+                                                    data-project="@entry.ProjectCode" 
+                                                    data-worktype="@entry.WorkTypeCode" 
+                                                    data-date="@entry.EntryDate.ToString("yyyy-MM-dd")" 
+                                                    data-starttime="@(entry.StartTime.HasValue ? entry.StartTime.Value.ToString("HH:mm") : "")" 
+                                                    data-endtime="@(entry.EndTime.HasValue ? entry.EndTime.Value.ToString("HH:mm") : "")" 
+                                                    data-hours="@entry.Hours.ToString("F2")" 
+                                                    data-notes="@entry.Notes">
+                                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" class="bi bi-pencil" viewBox="0 0 16 16">
+                                                    <path d="M12.146.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1 0 .708l-10 10a.5.5 0 0 1-.168.11l-5 2a.5.5 0 0 1-.65-.65l2-5a.5.5 0 0 1 .11-.168zM11.207 2.5 13.5 4.793 14.793 3.5 12.5 1.207zm1.586 3L10.5 3.207 4 9.707V10h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.293zm-9.761 5.175-.106.106-1.528 3.821 3.821-1.528.106-.106A.5.5 0 0 1 5 12.5V12h-.5a.5.5 0 0 1-.5-.5V11h-.5a.5.5 0 0 1-.468-.325"/>
+                                                </svg>
+                                                Edit
+                                            </button>
                                             <form asp-action="DeleteEntry" method="post" style="display:inline;">
                                                 <input type="hidden" name="id" value="@entry.Id" />
                                                 <input type="hidden" name="timeSheetId" value="@Model.TimeSheet.Id" />
@@ -228,9 +246,9 @@
                         </tbody>
                         <tfoot>
                             <tr class="table-active">
-                                <td colspan="3" class="text-end"><strong>Total:</strong></td>
+                                <td colspan="5" class="text-end"><strong>Total:</strong></td>
                                 <td><strong>@Model.TimeEntries.Sum(e => e.Hours).ToString("F2")</strong></td>
-                                <td colspan="@(Model.TimeSheet.Status == "Open" ? 2 : 1)"></td>
+                                <td colspan="@(Model.TimeSheet.Status == "Open" ? 1 : 0)"></td>
                             </tr>
                         </tfoot>
                     </table>
@@ -246,6 +264,93 @@
                     <p class="text-muted">Add your first time entry using the form above.</p>
                 </div>
             }
+        </div>
+    </div>
+    
+    <!-- Edit Time Entry Modal -->
+    <div class="modal fade" id="editEntryModal" tabindex="-1" aria-labelledby="editEntryModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title" id="editEntryModalLabel">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" class="bi bi-pencil me-2" viewBox="0 0 16 16">
+                            <path d="M12.146.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1 0 .708l-10 10a.5.5 0 0 1-.168.11l-5 2a.5.5 0 0 1-.65-.65l2-5a.5.5 0 0 1 .11-.168zM11.207 2.5 13.5 4.793 14.793 3.5 12.5 1.207zm1.586 3L10.5 3.207 4 9.707V10h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.293zm-9.761 5.175-.106.106-1.528 3.821 3.821-1.528.106-.106A.5.5 0 0 1 5 12.5V12h-.5a.5.5 0 0 1-.5-.5V11h-.5a.5.5 0 0 1-.468-.325"/>
+                        </svg>
+                        Edit Time Entry
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form asp-action="UpdateEntry" asp-route-timeSheetId="@Model.TimeSheet.Id" method="post">
+                    <input type="hidden" name="Id" id="editEntryId" />
+                    <input type="hidden" name="StartTime" id="editStartTimeHidden" />
+                    <input type="hidden" name="EndTime" id="editEndTimeHidden" />
+                    
+                    <div class="modal-body">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Project</label>
+                                <select name="ProjectCode" id="editProjectCode" class="form-select" required>
+                                    <option value="">Select Project...</option>
+                                    @foreach (var project in Model.AvailableProjects)
+                                    {
+                                        <option value="@project.Code">@project.Name (@project.Code)</option>
+                                    }
+                                </select>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <label class="form-label">Work Type</label>
+                                <select name="WorkTypeCode" id="editWorkTypeCode" class="form-select" required>
+                                    <option value="">Select Work Type...</option>
+                                    @foreach (var workType in Model.AvailableWorkTypes)
+                                    {
+                                        <option value="@workType.Code">@workType.Name (@workType.Code)</option>
+                                    }
+                                </select>
+                            </div>
+                            
+                            <div class="col-md-4">
+                                <label class="form-label">Date</label>
+                                <input type="date" name="EntryDate" id="editEntryDate" class="form-control" 
+                                       min="@Model.TimeSheet.StartDate.ToString("yyyy-MM-dd")"
+                                       max="@Model.TimeSheet.EndDate.ToString("yyyy-MM-dd")"
+                                       required />
+                            </div>
+                            
+                            <div class="col-md-4">
+                                <label class="form-label">Start Time</label>
+                                <input type="time" id="editStartTime" class="form-control" required />
+                            </div>
+                            
+                            <div class="col-md-4">
+                                <label class="form-label">End Time</label>
+                                <input type="time" id="editEndTime" class="form-control" required />
+                            </div>
+                            
+                            <div class="col-md-12">
+                                <label class="form-label">Calculated Hours</label>
+                                <input type="text" id="editCalculatedHours" class="form-control" readonly />
+                                <input type="hidden" name="Hours" id="editHoursInput" />
+                            </div>
+                            
+                            <div class="col-md-12">
+                                <label class="form-label">Notes (Optional)</label>
+                                <textarea name="Notes" id="editNotes" class="form-control" rows="3" placeholder="Additional details about this entry..."></textarea>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-check-lg me-1" viewBox="0 0 16 16">
+                                <path d="M12.736 3.97a.733.733 0 0 1 1.047 0c.286.289.29.756.01 1.05L7.88 12.01a.733.733 0 0 1-1.065.02L3.217 8.384a.757.757 0 0 1 0-1.06.733.733 0 0 1 1.047 0l3.052 3.093 5.4-6.425z"/>
+                            </svg>
+                            Save Changes
+                        </button>
+                    </div>
+                </form>
+            </div>
         </div>
     </div>
 </div>
@@ -288,11 +393,122 @@
                 document.getElementById('calculatedHours').value = '0.00';
                 document.getElementById('hoursInput').value = '0';
             }
+            
+            // Update hidden fields with full datetime
+            updateStartEndTimeHidden();
         }
         
-        // Add event listeners
+        // Calculate hours for edit modal
+        function calculateEditHours() {
+            const startTime = document.getElementById('editStartTime').value;
+            const endTime = document.getElementById('editEndTime').value;
+            
+            if (!startTime || !endTime) {
+                return;
+            }
+            
+            // Parse times
+            const [startHour, startMinute] = startTime.split(':').map(Number);
+            const [endHour, endMinute] = endTime.split(':').map(Number);
+            
+            // Convert to minutes since midnight
+            const startMinutes = startHour * 60 + startMinute;
+            let endMinutes = endHour * 60 + endMinute;
+            
+            // Handle overnight shifts (end time is next day)
+            if (endMinutes < startMinutes) {
+                endMinutes += 24 * 60;
+            }
+            
+            // Calculate difference in hours
+            const diffMinutes = endMinutes - startMinutes;
+            const hours = diffMinutes / 60;
+            
+            // Update display and hidden input
+            if (hours > 0 && hours <= 24) {
+                document.getElementById('editCalculatedHours').value = hours.toFixed(2);
+                document.getElementById('editHoursInput').value = hours.toFixed(2);
+            } else {
+                document.getElementById('editCalculatedHours').value = '0.00';
+                document.getElementById('editHoursInput').value = '0';
+            }
+            
+            // Update hidden fields with full datetime
+            updateEditStartEndTimeHidden();
+        }
+        
+        // Update hidden fields for create form
+        function updateStartEndTimeHidden() {
+            const entryDate = document.querySelector('input[name="EntryDate"]').value;
+            const startTime = document.getElementById('startTime').value;
+            const endTime = document.getElementById('endTime').value;
+            
+            if (entryDate && startTime) {
+                document.getElementById('startTimeHidden').value = entryDate + 'T' + startTime + ':00';
+            }
+            if (entryDate && endTime) {
+                document.getElementById('endTimeHidden').value = entryDate + 'T' + endTime + ':00';
+            }
+        }
+        
+        // Update hidden fields for edit form
+        function updateEditStartEndTimeHidden() {
+            const entryDate = document.getElementById('editEntryDate').value;
+            const startTime = document.getElementById('editStartTime').value;
+            const endTime = document.getElementById('editEndTime').value;
+            
+            if (entryDate && startTime) {
+                document.getElementById('editStartTimeHidden').value = entryDate + 'T' + startTime + ':00';
+            }
+            if (entryDate && endTime) {
+                document.getElementById('editEndTimeHidden').value = entryDate + 'T' + endTime + ':00';
+            }
+        }
+        
+        // Edit entry function using event delegation
+        document.addEventListener('click', function(e) {
+            if (e.target.closest('.edit-entry-btn')) {
+                const btn = e.target.closest('.edit-entry-btn');
+                
+                // Get data from button attributes
+                const id = btn.dataset.id;
+                const projectCode = btn.dataset.project;
+                const workTypeCode = btn.dataset.worktype;
+                const entryDate = btn.dataset.date;
+                const startTime = btn.dataset.starttime;
+                const endTime = btn.dataset.endtime;
+                const hours = btn.dataset.hours;
+                const notes = btn.dataset.notes;
+                
+                // Populate the edit form
+                document.getElementById('editEntryId').value = id;
+                document.getElementById('editProjectCode').value = projectCode;
+                document.getElementById('editWorkTypeCode').value = workTypeCode;
+                document.getElementById('editEntryDate').value = entryDate;
+                document.getElementById('editStartTime').value = startTime || '09:00';
+                document.getElementById('editEndTime').value = endTime || '17:00';
+                document.getElementById('editCalculatedHours').value = hours;
+                document.getElementById('editHoursInput').value = hours;
+                document.getElementById('editNotes').value = notes || '';
+                
+                // Update hidden datetime fields
+                updateEditStartEndTimeHidden();
+                
+                // Show the modal
+                var editModal = new bootstrap.Modal(document.getElementById('editEntryModal'));
+                editModal.show();
+            }
+        });
+        
+        // Add event listeners for create form
         document.getElementById('startTime').addEventListener('change', calculateHours);
         document.getElementById('endTime').addEventListener('change', calculateHours);
+        document.querySelector('input[name="EntryDate"]').addEventListener('change', updateStartEndTimeHidden);
+        
+        // Add event listeners for edit form
+        document.getElementById('editStartTime').addEventListener('change', calculateEditHours);
+        document.getElementById('editEndTime').addEventListener('change', calculateEditHours);
+        document.getElementById('editEntryDate').addEventListener('change', updateEditStartEndTimeHidden);
         
         // Calculate on page load
         calculateHours();
