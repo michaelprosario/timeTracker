@@ -27,6 +27,8 @@ builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
 builder.Services.AddScoped<UserService>();
 builder.Services.AddScoped<TimeSheetService>();
 builder.Services.AddScoped<TimeEntryService>();
+builder.Services.AddScoped<ProjectService>();
+builder.Services.AddScoped<WorkTypeService>();
 
 // Session
 builder.Services.AddDistributedMemoryCache();

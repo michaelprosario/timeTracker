@@ -29,6 +29,7 @@ public class TimeEntryRepository : ITimeEntryRepository
             .Include(t => t.Project)
             .Include(t => t.WorkType)
             .OrderBy(t => t.EntryDate)
+            .ThenBy(t => t.StartTime)
             .ToListAsync();
     }
     

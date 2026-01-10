@@ -1,0 +1,67 @@
+@model TimeTracker.Web.Models.WorkTypeListViewModel
+@{
+    ViewData["Title"] = "Work Types";
+}
+
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h1>Work Types</h1>
+        <a href="@Url.Action("Create")" class="btn btn-primary">Create New Work Type</a>
+    </div>
+    
+    @if (TempData["Success"] != null)
+    {
+        <div class="alert alert-success">@TempData["Success"]</div>
+    }
+    
+    @if (TempData["Error"] != null)
+    {
+        <div class="alert alert-danger">@TempData["Error"]</div>
+    }
+    
+    <div class="table-responsive">
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>Code</th>
+                    <th>Name</th>
+                    <th>Description</th>
+                    <th>Status</th>
+                    <th>Created</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var workType in Model.WorkTypes)
+                {
+                    <tr>
+                        <td><strong>@workType.Code</strong></td>
+                        <td>@workType.Name</td>
+                        <td>@workType.Description</td>
+                        <td>
+                            @if (workType.IsActive)
+                            {
+                                <span class="badge bg-success">Active</span>
+                            }
+                            else
+                            {
+                                <span class="badge bg-secondary">Inactive</span>
+                            }
+                        </td>
+                        <td>@workType.CreatedAt.ToShortDateString()</td>
+                        <td>
+                            <a href="@Url.Action("Edit", new { code = workType.Code })" class="btn btn-sm btn-primary">Edit</a>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+    
+    @if (!Model.WorkTypes.Any())
+    {
+        <div class="alert alert-info">
+            <p>No work types found. Click "Create New Work Type" to add one.</p>
+        </div>
+    }
+</div>
