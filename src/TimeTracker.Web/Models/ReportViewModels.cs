@@ -21,6 +21,7 @@ public class ProjectSummaryViewModel
     public string ProjectName { get; set; } = string.Empty;
     public decimal TotalHours { get; set; }
     public List<TimeEntryDetailViewModel> TimeEntries { get; set; } = new();
+    public List<DailyTotalViewModel> DailyTotals { get; set; } = new();
 }
 
 public class TimeEntryDetailViewModel
@@ -31,4 +32,10 @@ public class TimeEntryDetailViewModel
     public string WorkTypeCode { get; set; } = string.Empty;
     public string WorkTypeName { get; set; } = string.Empty;
     public string Notes { get; set; } = string.Empty;
+}
+
+public class DailyTotalViewModel
+{
+    public DateTime Date { get; set; }
+    public decimal Hours { get; set; }
 }

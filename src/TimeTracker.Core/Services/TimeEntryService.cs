@@ -223,12 +223,24 @@ public class TimeEntryService
                     });
                 }
                 
+                // Calculate daily totals
+                var dailyTotals = projectGroup
+                    .GroupBy(te => te.EntryDate.Date)
+                    .Select(g => new DailyTotalDto
+                    {
+                        Date = g.Key,
+                        Hours = g.Sum(te => te.Hours)
+                    })
+                    .OrderBy(dt => dt.Date)
+                    .ToList();
+
                 projectSummaries.Add(new ProjectTimeSummaryDto
                 {
                     ProjectCode = projectGroup.Key,
                     ProjectName = projectName,
                     TotalHours = projectGroup.Sum(te => te.Hours),
-                    TimeEntries = timeEntryDetails
+                    TimeEntries = timeEntryDetails,
+                    DailyTotals = dailyTotals
                 });
             }
             

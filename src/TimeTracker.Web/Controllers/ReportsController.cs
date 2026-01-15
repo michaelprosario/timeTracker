@@ -59,6 +59,11 @@ public class ReportsController : BaseController
                         WorkTypeCode = te.WorkTypeCode,
                         WorkTypeName = te.WorkTypeName,
                         Notes = te.Notes
+                    }).ToList(),
+                    DailyTotals = p.DailyTotals.Select(dt => new DailyTotalViewModel
+                    {
+                        Date = dt.Date,
+                        Hours = dt.Hours
                     }).ToList()
                 }).ToList()
             }).ToList()

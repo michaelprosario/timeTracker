@@ -24,6 +24,7 @@ public class ProjectTimeSummaryDto
     public string ProjectName { get; set; } = string.Empty;
     public decimal TotalHours { get; set; }
     public List<TimeEntryDetailDto> TimeEntries { get; set; } = new();
+    public List<DailyTotalDto> DailyTotals { get; set; } = new();
 }
 
 public class TimeEntryDetailDto
@@ -34,4 +35,10 @@ public class TimeEntryDetailDto
     public string WorkTypeCode { get; set; } = string.Empty;
     public string WorkTypeName { get; set; } = string.Empty;
     public string Notes { get; set; } = string.Empty;
+}
+
+public class DailyTotalDto
+{
+    public DateTime Date { get; set; }
+    public decimal Hours { get; set; }
 }
