@@ -1,0 +1,257 @@
+# GitHub Actions Workflow for Azure Deployment
+# This workflow builds, tests, and deploys the Time Tracker application to Azure
+
+name: Deploy to Azure
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+          - dev
+          - staging
+          - prod
+
+env:
+  DOTNET_VERSION: '10.0.x'
+  DOCKER_IMAGE_TAG: ${{ github.sha }}
+
+jobs:
+  # ============================================================================
+  # Build and Test
+  # ============================================================================
+  build-and-test:
+    name: Build and Test
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+      
+      - name: Restore dependencies
+        run: dotnet restore
+      
+      - name: Build
+        run: dotnet build --configuration Release --no-restore
+      
+      - name: Run tests
+        run: dotnet test --configuration Release --no-build --verbosity normal
+      
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: |
+            src/TimeTracker.Web/bin/Release
+            src/TimeTracker.Core/bin/Release
+            src/TimeTracker.Infrastructure/bin/Release
+
+  # ============================================================================
+  # Deploy to Development
+  # ============================================================================
+  deploy-dev:
+    name: Deploy to Development
+    runs-on: ubuntu-latest
+    needs: build-and-test
+    if: github.ref == 'refs/heads/develop' || github.event.inputs.environment == 'dev'
+    environment:
+      name: development
+      url: ${{ steps.deploy.outputs.webapp-url }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS_DEV }}
+      
+      - name: Set environment variables
+        run: |
+          echo "RESOURCE_GROUP=rg-timetracker-dev" >> $GITHUB_ENV
+          echo "ENVIRONMENT=dev" >> $GITHUB_ENV
+          echo "LOCATION=eastus" >> $GITHUB_ENV
+      
+      - name: Deploy infrastructure
+        id: deploy-infra
+        run: |
+          cd deployment/scripts
+          export POSTGRESQL_ADMIN_PASSWORD="${{ secrets.POSTGRESQL_ADMIN_PASSWORD_DEV }}"
+          export DOCKER_IMAGE_TAG="${{ github.sha }}"
+          ./deploy.sh \
+            --environment dev \
+            --location eastus \
+            --run-migrations
+        
+      - name: Get deployment outputs
+        id: deploy
+        run: |
+          WEB_APP_URL=$(az webapp show \
+            --name $(az webapp list --resource-group rg-timetracker-dev --query "[0].name" -o tsv) \
+            --resource-group rg-timetracker-dev \
+            --query defaultHostName -o tsv)
+          echo "webapp-url=https://${WEB_APP_URL}" >> $GITHUB_OUTPUT
+      
+      - name: Verify deployment
+        run: |
+          sleep 30  # Wait for app to start
+          curl -f "${{ steps.deploy.outputs.webapp-url }}/health" || exit 1
+
+  # ============================================================================
+  # Deploy to Staging
+  # ============================================================================
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: build-and-test
+    if: github.ref == 'refs/heads/main' || github.event.inputs.environment == 'staging'
+    environment:
+      name: staging
+      url: ${{ steps.deploy.outputs.webapp-url }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS_STAGING }}
+      
+      - name: Deploy infrastructure
+        run: |
+          cd deployment/scripts
+          export POSTGRESQL_ADMIN_PASSWORD="${{ secrets.POSTGRESQL_ADMIN_PASSWORD_STAGING }}"
+          export DOCKER_IMAGE_TAG="${{ github.sha }}"
+          ./deploy.sh \
+            --environment staging \
+            --location eastus \
+            --run-migrations
+      
+      - name: Get deployment outputs
+        id: deploy
+        run: |
+          WEB_APP_URL=$(az webapp show \
+            --name $(az webapp list --resource-group rg-timetracker-staging --query "[0].name" -o tsv) \
+            --resource-group rg-timetracker-staging \
+            --query defaultHostName -o tsv)
+          echo "webapp-url=https://${WEB_APP_URL}" >> $GITHUB_OUTPUT
+      
+      - name: Run smoke tests
+        run: |
+          sleep 30
+          curl -f "${{ steps.deploy.outputs.webapp-url }}/health"
+          # Add more smoke tests as needed
+
+  # ============================================================================
+  # Deploy to Production
+  # ============================================================================
+  deploy-prod:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: deploy-staging
+    if: github.ref == 'refs/heads/main' || github.event.inputs.environment == 'prod'
+    environment:
+      name: production
+      url: ${{ steps.deploy.outputs.webapp-url }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS_PROD }}
+      
+      - name: Create release tag
+        run: |
+          git tag -a "release-${{ github.sha }}" -m "Production release"
+          git push origin "release-${{ github.sha }}"
+      
+      - name: Deploy to production
+        run: |
+          cd deployment/scripts
+          export POSTGRESQL_ADMIN_PASSWORD="${{ secrets.POSTGRESQL_ADMIN_PASSWORD_PROD }}"
+          export DOCKER_IMAGE_TAG="${{ github.sha }}"
+          ./deploy.sh \
+            --environment prod \
+            --location westus2 \
+            --run-migrations
+      
+      - name: Get deployment outputs
+        id: deploy
+        run: |
+          WEB_APP_URL=$(az webapp show \
+            --name $(az webapp list --resource-group rg-timetracker-prod --query "[0].name" -o tsv) \
+            --resource-group rg-timetracker-prod \
+            --query defaultHostName -o tsv)
+          echo "webapp-url=https://${WEB_APP_URL}" >> $GITHUB_OUTPUT
+      
+      - name: Health check
+        run: |
+          sleep 60  # Wait longer for production startup
+          for i in {1..5}; do
+            if curl -f "${{ steps.deploy.outputs.webapp-url }}/health"; then
+              echo "Health check passed"
+              exit 0
+            fi
+            echo "Health check attempt $i failed, retrying..."
+            sleep 10
+          done
+          exit 1
+      
+      - name: Create GitHub Release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: release-${{ github.sha }}
+          release_name: Production Release ${{ github.sha }}
+          body: |
+            Deployed to production
+            - Commit: ${{ github.sha }}
+            - URL: ${{ steps.deploy.outputs.webapp-url }}
+          draft: false
+          prerelease: false
+
+  # ============================================================================
+  # Rollback (Manual workflow)
+  # ============================================================================
+  rollback:
+    name: Rollback Deployment
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS_PROD }}
+      
+      - name: Rollback
+        run: |
+          cd deployment/scripts
+          ./rollback.sh \
+            --resource-group rg-timetracker-${{ github.event.inputs.environment }} \
+            --use-slot
