@@ -1,0 +1,11 @@
+- As an engineer, I would like to deploy the time tracker application to microsoft azure using bicept templates
+    - We want this deployment code to serve as an example for the deployment stamps pattern
+    - Key secrets should be stored in azure key vault
+    - The time tracker application should be deployed to an app service
+    - The database should be deployed to a managed postgres instances
+    - The time sheet application image can be deployed to public docker hub
+    - The azure app service should pull secrets from the azure keyvault
+    - Write documentation to explain each step.
+
+- Think about this problem.
+- Document a refined plan in plan2.md

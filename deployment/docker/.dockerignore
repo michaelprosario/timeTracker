@@ -1,0 +1,107 @@
+# .dockerignore for Time Tracker Application
+# Excludes unnecessary files from Docker build context
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# CI/CD
+.github/
+.azure/
+azure-pipelines.yml
+.gitlab-ci.yml
+
+# Documentation
+*.md
+docs/
+Prompts/
+deployment/docs/
+
+# IDE and Editor files
+.vs/
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Build outputs
+**/bin/
+**/obj/
+**/out/
+**/publish/
+**/Debug/
+**/Release/
+**/.vs/
+
+# Test files
+**/tests/
+**/*.Tests/
+*.Test/
+**/*Tests.csproj
+
+# NuGet
+*.nupkg
+*.snupkg
+.nuget/
+packages/
+
+# User-specific files
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Node.js (if any)
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# Python (if any)
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+
+# Docker
+docker-compose*.yml
+Dockerfile*
+.dockerignore
+
+# Deployment files
+deployment/
+*.bicep
+*.bicepparam
+
+# Logs
+logs/
+*.log
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.bak
+*.cache
+
+# Environment files (should use Azure Key Vault)
+.env
+.env.*
+appsettings.*.json
+!appsettings.json
+
+# Secrets (should never be in Docker images)
+secrets/
+*.pfx
+*.key
+*.pem

@@ -3,11 +3,52 @@ using TimeTracker.Core.Interfaces;
 using TimeTracker.Core.Services;
 using TimeTracker.Infrastructure.Data;
 using TimeTracker.Infrastructure.Repositories;
+using Azure.Identity;
+using Azure.Security.KeyVault.Secrets;
+using Azure.Extensions.AspNetCore.Configuration.Secrets;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// ============================================================================
+// Azure Key Vault Configuration (for production deployments)
+// ============================================================================
+if (builder.Environment.IsProduction() || builder.Environment.IsStaging())
+{
+    var keyVaultName = builder.Configuration["KeyVaultName"];
+    if (!string.IsNullOrEmpty(keyVaultName))
+    {
+        var keyVaultUri = new Uri($"https://{keyVaultName}.vault.azure.net/");
+        
+        // Use DefaultAzureCredential which supports:
+        // - Managed Identity (in Azure)
+        // - Azure CLI (for local development)
+        // - Visual Studio, VS Code, etc.
+        builder.Configuration.AddAzureKeyVault(
+            keyVaultUri,
+            new DefaultAzureCredential());
+        
+        builder.Logging.AddConsole();
+        builder.Logging.LogInformation("Azure Key Vault configured: {KeyVaultUri}", keyVaultUri);
+    }
+}
+
 // Add services to the container.
 builder.Services.AddControllersWithViews();
+
+// Application Insights (if configured)
+var appInsightsConnectionString = builder.Configuration["APPLICATIONINSIGHTS_CONNECTION_STRING"];
+if (!string.IsNullOrEmpty(appInsightsConnectionString))
+{
+    builder.Services.AddApplicationInsightsTelemetry();
+}
+
+// Health checks
+builder.Services.AddHealthChecks()
+    .AddNpgSql(
+        builder.Configuration.GetConnectionString("DefaultConnection") 
+            ?? "Host=localhost;Port=5432;Database=timetracker;Username=postgres;Password=Foobar321",
+        name: "postgresql",
+        timeout: TimeSpan.FromSeconds(3));
 
 // Database
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") 
@@ -55,6 +96,9 @@ app.UseSession();
 app.UseAuthorization();
 
 app.MapStaticAssets();
+
+// Health check endpoint
+app.MapHealthChecks("/health");
 
 app.MapControllerRoute(
     name: "default",

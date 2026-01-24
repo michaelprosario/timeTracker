@@ -1,0 +1,56 @@
+# Production-optimized Dockerfile for Time Tracker
+# Multi-stage build with security hardening
+
+# ============================================================================
+# Stage 1: Build
+# ============================================================================
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+WORKDIR /src
+
+# Copy solution and project files
+COPY TimeTracker.slnx ./
+COPY src/TimeTracker.Core/TimeTracker.Core.csproj ./src/TimeTracker.Core/
+COPY src/TimeTracker.Infrastructure/TimeTracker.Infrastructure.csproj ./src/TimeTracker.Infrastructure/
+COPY src/TimeTracker.Web/TimeTracker.Web.csproj ./src/TimeTracker.Web/
+
+# Restore dependencies
+RUN dotnet restore ./src/TimeTracker.Web/TimeTracker.Web.csproj
+
+# Copy source code
+COPY src/ ./src/
+
+# Build and publish
+WORKDIR /src/src/TimeTracker.Web
+RUN dotnet build -c Release -o /app/build --no-restore
+RUN dotnet publish -c Release -o /app/publish --no-restore /p:UseAppHost=false
+
+# ============================================================================
+# Stage 2: Runtime
+# ============================================================================
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
+
+# Create non-root user for security
+RUN groupadd -r appuser && useradd -r -g appuser appuser
+
+WORKDIR /app
+
+# Copy published application
+COPY --from=build --chown=appuser:appuser /app/publish .
+
+# Switch to non-root user
+USER appuser
+
+# Configure ports
+EXPOSE 8080
+EXPOSE 8081
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=60s --retries=3 \
+    CMD curl -f http://localhost:8080/health || exit 1
+
+# Set environment variables
+ENV ASPNETCORE_URLS=http://+:8080 \
+    ASPNETCORE_ENVIRONMENT=Production \
+    DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false
+
+ENTRYPOINT ["dotnet", "TimeTracker.Web.dll"]
