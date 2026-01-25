@@ -1,4 +1,4 @@
-using './main.bicep'
+using '../main.bicep'
 
 // Production Environment Parameters
 param stampName = 'prod'

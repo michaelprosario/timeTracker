@@ -1,4 +1,4 @@
-using './main.bicep'
+using '../main.bicep'
 
 // Staging Environment Parameters
 param stampName = 'staging'

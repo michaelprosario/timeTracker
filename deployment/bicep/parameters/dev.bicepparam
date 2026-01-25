@@ -1,4 +1,4 @@
-using './main.bicep'
+using '../main.bicep'
 
 // Development Environment Parameters
 param stampName = 'dev'
