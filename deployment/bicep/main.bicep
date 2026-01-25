@@ -151,6 +151,7 @@ module appServiceModule 'modules/appservice.bicep' = {
     dockerHubPassword: dockerHubPassword
     subnetId: vnetModule.outputs.appServiceSubnetId
     appInsightsConnectionString: monitoringModule.outputs.appInsightsConnectionString
+    logAnalyticsWorkspaceId: monitoringModule.outputs.workspaceId
     tags: tags
   }
 }

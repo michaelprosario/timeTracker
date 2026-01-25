@@ -32,6 +32,9 @@ param subnetId string = ''
 @description('Application Insights connection string')
 param appInsightsConnectionString string = ''
 
+@description('Log Analytics workspace ID for diagnostic settings')
+param logAnalyticsWorkspaceId string = ''
+
 @description('Tags to apply to resources')
 param tags object = {}
 
@@ -107,11 +110,12 @@ resource webApp 'Microsoft.Web/sites@2023-01-01' = {
   }
 }
 
-// Configure diagnostic settings
-resource diagnosticSettings 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = {
+// Configure diagnostic settings (only if Log Analytics workspace is provided)
+resource diagnosticSettings 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = if (!empty(logAnalyticsWorkspaceId)) {
   name: '${webAppName}-diagnostics'
   scope: webApp
   properties: {
+    workspaceId: logAnalyticsWorkspaceId
     logs: [
       {
         category: 'AppServiceHTTPLogs'
