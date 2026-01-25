@@ -70,6 +70,10 @@ builder.Services.AddScoped<TimeEntryService>();
 builder.Services.AddScoped<ProjectService>();
 builder.Services.AddScoped<WorkTypeService>();
 
+// Data Protection - configure writable directory for keys
+builder.Services.AddDataProtection()
+    .PersistKeysToFileSystem(new DirectoryInfo("/tmp/dataprotection-keys"));
+
 // Session
 builder.Services.AddDistributedMemoryCache();
 builder.Services.AddSession(options =>
