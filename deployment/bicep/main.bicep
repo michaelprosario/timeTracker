@@ -75,14 +75,14 @@ var skuConfig = environment == 'prod' ? {
     name: 'Standard_B1ms'
     tier: 'Burstable'
   }
-  acr: 'Basic'
+  acr: 'Standard'
 } : {
   appService: 'B1'
   postgresql: {
     name: 'Standard_B1ms'
     tier: 'Burstable'
   }
-  acr: 'Basic'
+  acr: 'Standard'
 }
 
 // ============================================================================
