@@ -1,15 +1,20 @@
 # Time Tracker - Azure Deployment
 
-Complete Infrastructure as Code (IaC) deployment for the Time Tracker application using Azure Bicep templates and the Deployment Stamps pattern.
+Complete Infrastructure as Code (IaC) deployment for the Time Tracker application using Azure Bicep templates, the Deployment Stamps pattern, and Docker Hub for container image hosting.
 
 ## 🚀 Quick Start
 
 ```bash
-# Set required environment variable
+# Set required environment variables
 export POSTGRESQL_ADMIN_PASSWORD="YourSecurePassword123!"
+export DOCKERHUB_USERNAME="your-dockerhub-username"
+export DOCKERHUB_PASSWORD="your-dockerhub-access-token"
+
+# Build and push Docker image
+cd deployment/scripts
+./build-and-push.sh --dockerhub-username $DOCKERHUB_USERNAME --tag latest
 
 # Deploy to development
-cd deployment/scripts
 ./deploy.sh --environment dev --location eastus --run-migrations
 
 # Your application will be available at the URL shown in the deployment output
@@ -32,7 +37,7 @@ This deployment creates a complete, production-ready infrastructure on Azure inc
 - **App Service**: Containerized .NET 10.0 application
 - **PostgreSQL**: Managed database with VNet integration
 - **Key Vault**: Secure secret management
-- **Container Registry**: Private Docker registry
+- **Docker Hub**: Public/private container image hosting
 - **Monitoring**: Application Insights & Log Analytics
 - **Networking**: Virtual Network with subnet isolation
 
@@ -48,17 +53,31 @@ This deployment creates a complete, production-ready infrastructure on Azure inc
 │  └──────┬─────┘    └──────────────┘            │
 │         │                                        │
 │         ▼                                        │
-│  ┌────────────┐    ┌──────────────┐            │
-│  │ Key Vault  │    │     ACR      │            │
-│  │ (Secrets)  │    │  (Images)    │            │
-│  └────────────┘    └──────────────┘            │
-│                                                  │
+│  ┌────────────┐                                 │
+│  │ Key Vault  │                                 │
+│  │ (Secrets)  │                                 │
+│  └────────────┘                                 │
+│         │                                        │
 │  ┌────────────┐    ┌──────────────┐            │
 │  │    Log     │    │  App Insights│            │
 │  │ Analytics  │    │ (Monitoring) │            │
 │  └────────────┘    └──────────────┘            │
 └─────────────────────────────────────────────────┘
+                       │
+                       │ Pulls images from
+                       ▼
+             ┌──────────────────┐
+             │   Docker Hub     │
+             │  (Public/Private)│
+             └──────────────────┘
 ```
+
+### Key Features
+
+- **Docker Hub Integration**: Container images hosted on Docker Hub for public distribution
+- **Cost Optimized**: ~$40-45/month savings by eliminating Azure Container Registry
+- **Multi-Cloud Ready**: Images can be pulled from any cloud provider
+- **Open Source Friendly**: Easy sharing and community distribution
 
 ## Prerequisites
 
@@ -70,6 +89,22 @@ This deployment creates a complete, production-ready infrastructure on Azure inc
 | Docker | 20.10+ | `curl -fsSL https://get.docker.com \| sh` |
 | .NET SDK | 10.0 | [Download](https://dotnet.microsoft.com/download) |
 | jq | latest | `sudo apt-get install -y jq` |
+
+### Docker Hub Account
+
+- Docker Hub account (free or Pro)
+- Access token generated (recommended over password)
+- Repository created: `{username}/timetracker`
+
+**Setup Docker Hub:**
+```bash
+# 1. Create account at https://hub.docker.com/signup
+# 2. Generate access token at https://hub.docker.com/settings/security
+# 3. Set environment variables
+export DOCKERHUB_USERNAME="your-username"
+export DOCKERHUB_PASSWORD="your-access-token"
+export DOCKERHUB_REPOSITORY="${DOCKERHUB_USERNAME}/timetracker"
+```
 
 ### Azure Requirements
 
@@ -87,7 +122,6 @@ deployment/
 │   │   ├── vnet.bicep             # Virtual Network
 │   │   ├── keyvault.bicep         # Key Vault
 │   │   ├── postgresql.bicep       # PostgreSQL Server
-│   │   ├── acr.bicep              # Container Registry
 │   │   ├── appservice.bicep       # App Service & Plan
 │   │   └── monitoring.bicep       # Log Analytics & App Insights
 │   └── parameters/                 # Environment parameters
@@ -97,7 +131,7 @@ deployment/
 │
 ├── scripts/                        # Deployment automation
 │   ├── deploy.sh                  # Main deployment script
-│   ├── build-and-push.sh          # Docker build & push
+│   ├── build-and-push.sh          # Docker build & push to Docker Hub
 │   ├── run-migrations.sh          # Database migrations
 │   └── rollback.sh                # Rollback procedures
 │

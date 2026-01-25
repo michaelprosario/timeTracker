@@ -33,6 +33,16 @@ param postgresqlAdminPassword string
 @description('The Docker image tag to deploy')
 param dockerImageTag string = 'latest'
 
+@description('Docker Hub username/repository (e.g., username/timetracker)')
+param dockerHubRepository string
+
+@description('Docker Hub username for authentication (optional for public repos)')
+param dockerHubUsername string = ''
+
+@description('Docker Hub password or access token (optional for public repos)')
+@secure()
+param dockerHubPassword string = ''
+
 @description('Deployment timestamp')
 param deploymentTimestamp string = utcNow()
 
@@ -55,7 +65,6 @@ var naming = {
   vnet: '${prefix}-vnet'
   keyVault: 'kv-${stampName}-${uniqueSuffix}'
   postgresql: '${prefix}-postgres-${uniqueSuffix}'
-  acr: 'acr${stampName}${uniqueSuffix}'
   appServicePlan: '${prefix}-asp'
   webApp: '${prefix}-web-${uniqueSuffix}'
   logAnalytics: '${prefix}-logs'
@@ -68,21 +77,18 @@ var skuConfig = environment == 'prod' ? {
     name: 'Standard_D2s_v3'
     tier: 'GeneralPurpose'
   }
-  acr: 'Standard'
 } : environment == 'staging' ? {
   appService: 'S1'
   postgresql: {
     name: 'Standard_B1ms'
     tier: 'Burstable'
   }
-  acr: 'Standard'
 } : {
   appService: 'B1'
   postgresql: {
     name: 'Standard_B1ms'
     tier: 'Burstable'
   }
-  acr: 'Basic'
 }
 
 // ============================================================================
@@ -111,19 +117,7 @@ module monitoringModule 'modules/monitoring.bicep' = {
   }
 }
 
-// 3. Container Registry
-module acrModule 'modules/acr.bicep' = {
-  name: 'deploy-acr'
-  params: {
-    acrName: naming.acr
-    location: location
-    sku: skuConfig.acr
-    adminUserEnabled: true
-    tags: tags
-  }
-}
-
-// 4. PostgreSQL Database
+// 3. PostgreSQL Database
 module postgresqlModule 'modules/postgresql.bicep' = {
   name: 'deploy-postgresql'
   params: {
@@ -143,7 +137,7 @@ module postgresqlModule 'modules/postgresql.bicep' = {
   }
 }
 
-// 5. App Service
+// 4. App Service
 module appServiceModule 'modules/appservice.bicep' = {
   name: 'deploy-appservice'
   params: {
@@ -151,17 +145,17 @@ module appServiceModule 'modules/appservice.bicep' = {
     webAppName: naming.webApp
     location: location
     sku: skuConfig.appService
-    acrLoginServer: acrModule.outputs.acrLoginServer
-    dockerImageName: 'timetracker:${dockerImageTag}'
-    acrUsername: naming.acr
-    acrPassword: acrModule.outputs.acrPassword
+    dockerHubRepository: dockerHubRepository
+    dockerImageTag: dockerImageTag
+    dockerHubUsername: dockerHubUsername
+    dockerHubPassword: dockerHubPassword
     subnetId: vnetModule.outputs.appServiceSubnetId
     appInsightsConnectionString: monitoringModule.outputs.appInsightsConnectionString
     tags: tags
   }
 }
 
-// 6. Key Vault (after App Service for managed identity)
+// 5. Key Vault (after App Service for managed identity)
 module keyVaultModule 'modules/keyvault.bicep' = {
   name: 'deploy-keyvault'
   params: {
@@ -205,12 +199,12 @@ resource postgresqlAdminPasswordSecret 'Microsoft.KeyVault/vaults/secrets@2023-0
   }
 }
 
-// ACR Credentials
-resource acrPasswordSecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = {
+// Docker Hub Password Secret (only if provided)
+resource dockerHubPasswordSecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = if (!empty(dockerHubPassword)) {
   parent: keyVault
-  name: 'ACR--Password'
+  name: 'DockerHub--Password'
   properties: {
-    value: acrModule.outputs.acrPassword
+    value: dockerHubPassword
     contentType: 'text/plain'
   }
 }
@@ -230,20 +224,21 @@ resource webApp 'Microsoft.Web/sites@2023-01-01' existing = {
 resource webAppConfig 'Microsoft.Web/sites/config@2023-01-01' = {
   parent: webApp
   name: 'appsettings'
-  properties: {
+  properties: union({
     WEBSITES_ENABLE_APP_SERVICE_STORAGE: 'false'
-    DOCKER_REGISTRY_SERVER_URL: 'https://${acrModule.outputs.acrLoginServer}'
-    DOCKER_REGISTRY_SERVER_USERNAME: '@Microsoft.KeyVault(SecretUri=https://${naming.keyVault}.vault.azure.net/secrets/ACR--Password/)'
-    DOCKER_REGISTRY_SERVER_PASSWORD: '@Microsoft.KeyVault(SecretUri=https://${naming.keyVault}.vault.azure.net/secrets/ACR--Password/)'
     WEBSITES_PORT: '8080'
     ASPNETCORE_ENVIRONMENT: environment == 'prod' ? 'Production' : 'Development'
     APPLICATIONINSIGHTS_CONNECTION_STRING: monitoringModule.outputs.appInsightsConnectionString
     ApplicationInsightsAgent_EXTENSION_VERSION: '~3'
     ConnectionStrings__DefaultConnection: '@Microsoft.KeyVault(SecretUri=https://${naming.keyVault}.vault.azure.net/secrets/ConnectionStrings--DefaultConnection/)'
-  }
+  }, !empty(dockerHubUsername) ? {
+    DOCKER_REGISTRY_SERVER_URL: 'https://index.docker.io/v1'
+    DOCKER_REGISTRY_SERVER_USERNAME: dockerHubUsername
+    DOCKER_REGISTRY_SERVER_PASSWORD: '@Microsoft.KeyVault(SecretUri=https://${naming.keyVault}.vault.azure.net/secrets/DockerHub--Password/)'
+  } : {})
   dependsOn: [
     postgresqlConnectionStringSecret
-    acrPasswordSecret
+    dockerHubPasswordSecret
   ]
 }
 
@@ -269,9 +264,8 @@ output postgresqlServerName string = postgresqlModule.outputs.serverName
 output postgresqlServerFqdn string = postgresqlModule.outputs.serverFqdn
 output databaseName string = postgresqlModule.outputs.databaseName
 
-// Container Registry
-output acrLoginServer string = acrModule.outputs.acrLoginServer
-output acrName string = acrModule.outputs.acrName
+// Docker Hub
+output dockerHubRepository string = dockerHubRepository
 
 // Key Vault
 output keyVaultName string = keyVaultModule.outputs.keyVaultName

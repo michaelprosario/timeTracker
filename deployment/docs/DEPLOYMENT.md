@@ -1,6 +1,6 @@
 # Time Tracker Deployment Guide
 
-This guide provides step-by-step instructions for deploying the Time Tracker application to Microsoft Azure using Bicep Infrastructure as Code templates.
+This guide provides step-by-step instructions for deploying the Time Tracker application to Microsoft Azure using Bicep Infrastructure as Code templates with Docker Hub for container image hosting.
 
 ## Table of Contents
 
@@ -53,6 +53,21 @@ This guide provides step-by-step instructions for deploying the Time Tracker app
    sudo apt-get install jq -y
    ```
 
+### Docker Hub Account
+
+- Docker Hub account (free or Pro)
+- Docker Hub repository created (e.g., `yourusername/timetracker`)
+- Docker Hub access token (recommended over password)
+
+**Creating Docker Hub Access Token:**
+```bash
+# 1. Go to https://hub.docker.com/settings/security
+# 2. Click "New Access Token"
+# 3. Name it (e.g., "timetracker-deployment")
+# 4. Copy the token (you won't see it again)
+# 5. Save it securely
+```
+
 ### Azure Subscription
 
 - Active Azure subscription with appropriate permissions
@@ -100,27 +115,33 @@ The deployment creates the following resources following the **Deployment Stamps
 │  │  (Linux)         │──│  Server                │     │
 │  │  + Managed ID    │  │  (Private VNet)        │     │
 │  └──────────────────┘  └────────────────────────┘     │
-│           │                                             │
-│           ▼                                             │
-│  ┌──────────────────┐  ┌────────────────────────┐     │
-│  │  Azure Key Vault │  │  Container Registry    │     │
-│  │  (Secrets)       │  │  (ACR)                 │     │
-│  └──────────────────┘  └────────────────────────┘     │
-│                                                          │
+│           │                      ▲                      │
+│           ▼                      │                      │
+│  ┌──────────────────┐           │                      │
+│  │  Azure Key Vault │           │                      │
+│  │  (Secrets)       │           │                      │
+│  └──────────────────┘           │                      │
+│                                   │                      │
 │  ┌──────────────────┐  ┌────────────────────────┐     │
 │  │  Log Analytics   │  │  Application Insights  │     │
 │  └──────────────────┘  └────────────────────────┘     │
 └─────────────────────────────────────────────────────────┘
+                           │
+                           ▼
+                  ┌─────────────────┐
+                  │  Docker Hub     │
+                  │  (Public)       │
+                  └─────────────────┘
 ```
 
-### Security Features
+### Key Design Decisions
 
-1. **Managed Identity**: App Service uses system-assigned managed identity
-2. **Key Vault Integration**: All secrets stored in Azure Key Vault
-3. **VNet Integration**: App Service and PostgreSQL communicate over private network
-4. **No Public Database Access**: PostgreSQL only accessible from App Service subnet
-5. **TLS/SSL**: All connections encrypted in transit
-6. **RBAC**: Role-based access control for all resources
+- **Docker Hub**: Container images hosted on Docker Hub for public distribution
+- **No ACR**: Eliminates Azure Container Registry costs (~$45/month savings)
+- **Public/Private Images**: Supports both public and private Docker Hub repositories
+- **Managed Identity**: App Service uses system-assigned managed identity
+- **Key Vault Integration**: All secrets stored in Azure Key Vault
+- **VNet Integration**: App Service and PostgreSQL communicate over private network
 
 ---
 
@@ -136,8 +157,13 @@ cd timeTracker
 ### Step 2: Set Environment Variables
 
 ```bash
-# Set PostgreSQL admin password (required)
+# Required: PostgreSQL admin password
 export POSTGRESQL_ADMIN_PASSWORD="YourSecurePassword123!"
+
+# Required: Docker Hub credentials
+export DOCKERHUB_USERNAME="your-dockerhub-username"
+export DOCKERHUB_PASSWORD="your-dockerhub-access-token"  # Use access token, not password
+export DOCKERHUB_REPOSITORY="your-dockerhub-username/timetracker"
 
 # Optional: Set Docker image tag (defaults to timestamp)
 export DOCKER_IMAGE_TAG="v1.0.0"
@@ -145,22 +171,39 @@ export DOCKER_IMAGE_TAG="v1.0.0"
 
 **Security Note**: Never commit passwords to source control. Use environment variables or Azure Key Vault for all secrets.
 
-### Step 3: Run the Deployment Script
+**For Public Docker Hub Repositories**: If using a public repository, you can omit `DOCKERHUB_PASSWORD` and the App Service will pull images without authentication.
+
+### Step 3: Build and Push Docker Image
+
+Before deploying infrastructure, build and push your Docker image to Docker Hub:
+
+```bash
+cd deployment/scripts
+
+# Build and push to Docker Hub
+./build-and-push.sh --dockerhub-username $DOCKERHUB_USERNAME --tag $DOCKER_IMAGE_TAG
+```
+
+This will:
+1. Login to Docker Hub
+2. Build the Docker image
+3. Tag it with your specified tag and `latest`
+4. Push to Docker Hub
+
+### Step 4: Deploy Infrastructure
 
 #### Development Environment
 
 ```bash
-cd deployment/scripts
 ./deploy.sh --environment dev --location eastus
 ```
 
 This will:
 1. Create resource group `rg-timetracker-dev`
-2. Deploy all infrastructure using Bicep
-3. Build Docker image
-4. Push image to Azure Container Registry
-5. Deploy application to App Service
-6. Configure Key Vault secrets
+2. Deploy all infrastructure using Bicep (App Service, PostgreSQL, Key Vault, etc.)
+3. Configure App Service to pull from Docker Hub
+4. Configure Key Vault secrets
+5. Restart App Service to pull the image
 
 #### Staging Environment
 
@@ -174,13 +217,12 @@ This will:
 ./deploy.sh --environment prod --location westus2 --run-migrations
 ```
 
-### Step 4: Wait for Deployment
+### Step 5: Wait for Deployment
 
-The deployment process takes approximately 15-20 minutes:
+The deployment process takes approximately 10-15 minutes:
 
 - Infrastructure provisioning: ~10 minutes
-- Docker build and push: ~5 minutes
-- Application startup: ~2 minutes
+- Application startup: ~2-3 minutes
 
 You'll see output like:
 
@@ -191,6 +233,7 @@ You'll see output like:
 [INFO] Environment:      dev
 [INFO] Resource Group:   rg-timetracker-dev
 [INFO] Location:         eastus
+[INFO] Docker Hub:       michaelprosario/timetracker
 [INFO] Docker Tag:       20260124-150000
 [INFO] ========================================
 [SUCCESS] All prerequisites are met
@@ -198,6 +241,7 @@ You'll see output like:
 [SUCCESS] Resource group ready
 [INFO] Deploying infrastructure with Bicep...
 [SUCCESS] Infrastructure deployed successfully
+```
 [INFO] Building Docker image...
 [SUCCESS] Docker image built successfully
 [SUCCESS] Image pushed to ACR

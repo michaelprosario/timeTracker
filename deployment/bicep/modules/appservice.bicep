@@ -13,19 +13,18 @@ param location string
 @description('The SKU for the App Service Plan')
 param sku string = 'B1'
 
-@description('The ACR login server')
-param acrLoginServer string
+@description('Docker Hub repository (e.g., username/timetracker)')
+param dockerHubRepository string
 
-@description('The Docker image name')
-param dockerImageName string = 'timetracker:latest'
+@description('The Docker image tag')
+param dockerImageTag string = 'latest'
 
-@description('The ACR username')
+@description('Docker Hub username (optional for public repos)')
+param dockerHubUsername string = ''
+
+@description('Docker Hub password or token (optional for public repos)')
 @secure()
-param acrUsername string
-
-@description('The ACR password')
-@secure()
-param acrPassword string
+param dockerHubPassword string = ''
 
 @description('The subnet ID for VNet integration')
 param subnetId string = ''
@@ -64,27 +63,15 @@ resource webApp 'Microsoft.Web/sites@2023-01-01' = {
     httpsOnly: true
     virtualNetworkSubnetId: !empty(subnetId) ? subnetId : null
     siteConfig: {
-      linuxFxVersion: 'DOCKER|${acrLoginServer}/${dockerImageName}'
+      linuxFxVersion: 'DOCKER|${dockerHubRepository}:${dockerImageTag}'
       alwaysOn: true
       http20Enabled: true
       minTlsVersion: '1.2'
       ftpsState: 'Disabled'
-      appSettings: [
+      appSettings: concat([
         {
           name: 'WEBSITES_ENABLE_APP_SERVICE_STORAGE'
           value: 'false'
-        }
-        {
-          name: 'DOCKER_REGISTRY_SERVER_URL'
-          value: 'https://${acrLoginServer}'
-        }
-        {
-          name: 'DOCKER_REGISTRY_SERVER_USERNAME'
-          value: acrUsername
-        }
-        {
-          name: 'DOCKER_REGISTRY_SERVER_PASSWORD'
-          value: acrPassword
         }
         {
           name: 'WEBSITES_PORT'
@@ -102,7 +89,20 @@ resource webApp 'Microsoft.Web/sites@2023-01-01' = {
           name: 'ApplicationInsightsAgent_EXTENSION_VERSION'
           value: '~3'
         }
-      ]
+      ], !empty(dockerHubUsername) ? [
+        {
+          name: 'DOCKER_REGISTRY_SERVER_URL'
+          value: 'https://index.docker.io/v1'
+        }
+        {
+          name: 'DOCKER_REGISTRY_SERVER_USERNAME'
+          value: dockerHubUsername
+        }
+        {
+          name: 'DOCKER_REGISTRY_SERVER_PASSWORD'
+          value: dockerHubPassword
+        }
+      ] : [])
     }
   }
 }

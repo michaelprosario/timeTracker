@@ -77,7 +77,10 @@ EXAMPLES:
 
 ENVIRONMENT VARIABLES:
     POSTGRESQL_ADMIN_PASSWORD   PostgreSQL administrator password (required)
-    DOCKER_IMAGE_TAG            Docker image tag (default: latest)
+    DOCKER_IMAGE_TAG            Docker image tag (default: timestamp)
+    DOCKERHUB_USERNAME          Docker Hub username (required)
+    DOCKERHUB_PASSWORD          Docker Hub password or access token (optional)
+    DOCKERHUB_REPOSITORY        Docker Hub repository (default: michaelprosario/timetracker)
 
 EOF
 }
@@ -149,6 +152,18 @@ if [ -z "$POSTGRESQL_ADMIN_PASSWORD" ]; then
     export POSTGRESQL_ADMIN_PASSWORD
 fi
 
+# Check for Docker Hub credentials
+if [ -z "$DOCKERHUB_USERNAME" ]; then
+    print_error "DOCKERHUB_USERNAME environment variable is required"
+    print_info "Set it with: export DOCKERHUB_USERNAME=your-username"
+    exit 1
+fi
+
+if [ -z "$DOCKERHUB_REPOSITORY" ]; then
+    DOCKERHUB_REPOSITORY="${DOCKERHUB_USERNAME}/timetracker"
+    export DOCKERHUB_REPOSITORY
+fi
+
 # Set default resource group if not provided
 if [ -z "$RESOURCE_GROUP" ]; then
     RESOURCE_GROUP="rg-timetracker-${ENVIRONMENT}"
@@ -171,6 +186,7 @@ print_info "========================================"
 print_info "Environment:      ${ENVIRONMENT}"
 print_info "Resource Group:   ${RESOURCE_GROUP}"
 print_info "Location:         ${LOCATION}"
+print_info "Docker Hub:       ${DOCKERHUB_REPOSITORY}"
 print_info "Docker Tag:       ${DOCKER_IMAGE_TAG}"
 print_info "Skip Build:       ${SKIP_BUILD}"
 print_info "Skip Bicep:       ${SKIP_BICEP}"
@@ -217,8 +233,6 @@ if [ "$SKIP_BICEP" = false ]; then
     print_success "Infrastructure deployed successfully"
     
     # Extract outputs
-    ACR_NAME=$(jq -r '.properties.outputs.acrName.value' deployment-output.json)
-    ACR_LOGIN_SERVER=$(jq -r '.properties.outputs.acrLoginServer.value' deployment-output.json)
     WEB_APP_NAME=$(jq -r '.properties.outputs.webAppName.value' deployment-output.json)
     WEB_APP_URL=$(jq -r '.properties.outputs.webAppUrl.value' deployment-output.json)
     POSTGRES_SERVER=$(jq -r '.properties.outputs.postgresqlServerName.value' deployment-output.json)
@@ -226,7 +240,6 @@ if [ "$SKIP_BICEP" = false ]; then
     DATABASE_NAME=$(jq -r '.properties.outputs.databaseName.value' deployment-output.json)
     KEY_VAULT_NAME=$(jq -r '.properties.outputs.keyVaultName.value' deployment-output.json)
     
-    print_info "ACR Name: ${ACR_NAME}"
     print_info "Web App Name: ${WEB_APP_NAME}"
     print_info "Web App URL: ${WEB_APP_URL}"
     print_info "PostgreSQL Server: ${POSTGRES_SERVER}"
@@ -236,34 +249,21 @@ else
     # Need to retrieve existing values
     print_info "Retrieving existing resource information..."
     
-    ACR_NAME=$(az acr list --resource-group "${RESOURCE_GROUP}" --query "[0].name" -o tsv)
-    ACR_LOGIN_SERVER=$(az acr show --name "${ACR_NAME}" --query loginServer -o tsv)
     WEB_APP_NAME=$(az webapp list --resource-group "${RESOURCE_GROUP}" --query "[0].name" -o tsv)
     WEB_APP_URL="https://$(az webapp show --name "${WEB_APP_NAME}" --resource-group "${RESOURCE_GROUP}" --query defaultHostName -o tsv)"
 fi
 
 # Build and push Docker image
 if [ "$SKIP_BUILD" = false ]; then
-    print_info "Building Docker image..."
+    print_info "Building and pushing Docker image..."
     
-    # Login to ACR
-    az acr login --name "${ACR_NAME}"
+    # Use the build-and-push.sh script
+    "${SCRIPT_DIR}/build-and-push.sh" \
+        --dockerhub-username "${DOCKERHUB_USERNAME}" \
+        --repository "$(basename ${DOCKERHUB_REPOSITORY})" \
+        --tag "${DOCKER_IMAGE_TAG}"
     
-    # Build the image
-    docker build \
-        -t "${ACR_LOGIN_SERVER}/timetracker:${DOCKER_IMAGE_TAG}" \
-        -t "${ACR_LOGIN_SERVER}/timetracker:latest" \
-        -f "${PROJECT_ROOT}/Dockerfile" \
-        "${PROJECT_ROOT}"
-    
-    print_success "Docker image built successfully"
-    
-    # Push to ACR
-    print_info "Pushing image to Azure Container Registry..."
-    docker push "${ACR_LOGIN_SERVER}/timetracker:${DOCKER_IMAGE_TAG}"
-    docker push "${ACR_LOGIN_SERVER}/timetracker:latest"
-    
-    print_success "Image pushed to ACR"
+    print_success "Image pushed to Docker Hub: ${DOCKERHUB_REPOSITORY}:${DOCKER_IMAGE_TAG}"
     
     # Restart web app to pull new image
     print_info "Restarting web app to pull new image..."
@@ -291,6 +291,7 @@ print_info "========================================"
 print_info "Web Application URL: ${WEB_APP_URL}"
 print_info "Resource Group: ${RESOURCE_GROUP}"
 print_info "Environment: ${ENVIRONMENT}"
+print_info "Docker Hub: ${DOCKERHUB_REPOSITORY}"
 print_info "Docker Image Tag: ${DOCKER_IMAGE_TAG}"
 print_info "========================================"
 print_info ""
@@ -308,13 +309,12 @@ Timestamp: $(date)
 Environment: ${ENVIRONMENT}
 Resource Group: ${RESOURCE_GROUP}
 Location: ${LOCATION}
+Docker Hub: ${DOCKERHUB_REPOSITORY}
 Docker Image Tag: ${DOCKER_IMAGE_TAG}
 
 Resources:
 - Web App: ${WEB_APP_NAME}
 - Web App URL: ${WEB_APP_URL}
-- ACR: ${ACR_NAME}
-- ACR Login Server: ${ACR_LOGIN_SERVER}
 
 Commands:
 - View logs: az webapp log tail --name ${WEB_APP_NAME} --resource-group ${RESOURCE_GROUP}

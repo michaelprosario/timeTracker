@@ -4,6 +4,8 @@
 
 The Time Tracker application is deployed to Microsoft Azure using a modern cloud-native architecture following best practices for security, scalability, and maintainability. The deployment uses the **Deployment Stamps Pattern**, allowing for multiple isolated instances that can be deployed across regions or environments.
 
+This architecture leverages **Docker Hub** for public container image distribution, eliminating the need for Azure Container Registry and reducing deployment costs while enabling broader software sharing.
+
 ## Architecture Diagram
 
 ```
@@ -42,11 +44,21 @@ The Time Tracker application is deployed to Microsoft Azure using a modern cloud
 │  │  │  ┌────────────────────────────────────────────┐    │  │   │
 │  │  │  │  App Service (Web App)                     │    │  │   │
 │  │  │  │  - Container: .NET 10.0 Alpine             │    │  │   │
+│  │  │  │  - Image Source: Docker Hub                │    │  │   │
 │  │  │  │  - System-Assigned Managed Identity        │    │  │   │
 │  │  │  │  - VNet Integration                        │    │  │   │
 │  │  │  │  - Health Check: /health                   │    │  │   │
 │  │  │  │  - Deployment Slots (Prod only)            │    │  │   │
 │  │  │  └────────────────────────────────────────────┘    │  │   │
+│  │  └─────────────────────────────────────────────────────┘  │   │
+│  │                 │                                           │   │
+│  │                 │ Pulls container image                    │   │
+│  │                 ▼                                           │   │
+│  │  ┌─────────────────────────────────────────────────────┐  │   │
+│  │  │     Docker Hub (External - Public Internet)         │  │   │
+│  │  │  - Repository: {username}/timetracker               │  │   │
+│  │  │  - Public or Private repository                     │  │   │
+│  │  │  - Multiple tags (latest, v1.0.0, sha-abc123)      │  │   │
 │  │  └─────────────────────────────────────────────────────┘  │   │
 │  │                                                             │   │
 │  │  ┌─────────────────────────────────────────────────────┐  │   │
@@ -73,25 +85,13 @@ The Time Tracker application is deployed to Microsoft Azure using a modern cloud
 │  │  │  │  - Secrets:                                │    │  │   │
 │  │  │  │    • DB Connection String                  │    │  │   │
 │  │  │  │    • PostgreSQL Admin Password             │    │  │   │
-│  │  │  │    • ACR Credentials                       │    │  │   │
+│  │  │  │    • Docker Hub Credentials (if private)   │    │  │   │
 │  │  │  └────────────────────────────────────────────┘    │  │   │
 │  │  │           ▲                                         │  │   │
 │  │  │           │ Managed Identity Access                │  │   │
 │  │  │           │                                         │  │   │
 │  │  └───────────┼─────────────────────────────────────────┘  │   │
 │  │              │                                             │   │
-│  │  ┌───────────┴─────────────────────────────────────────┐  │   │
-│  │  │            Container Registry                       │  │   │
-│  │  │                                                      │  │   │
-│  │  │  ┌────────────────────────────────────────────┐    │  │   │
-│  │  │  │  Azure Container Registry (ACR)            │    │  │   │
-│  │  │  │  - Private registry for app images         │    │  │   │
-│  │  │  │  - Integrated with App Service             │    │  │   │
-│  │  │  │  - Image retention: 7 days                 │    │  │   │
-│  │  │  │  - Webhook for automated deployments       │    │  │   │
-│  │  │  └────────────────────────────────────────────┘    │  │   │
-│  │  └─────────────────────────────────────────────────────┘  │   │
-│  │                                                             │   │
 │  │  ┌─────────────────────────────────────────────────────┐  │   │
 │  │  │            Monitoring & Observability               │  │   │
 │  │  │                                                      │  │   │
@@ -115,6 +115,24 @@ The Time Tracker application is deployed to Microsoft Azure using a modern cloud
 │  └─────────────────────────────────────────────────────────────┘   │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
+
+## Key Architecture Decisions
+
+### Docker Hub vs Azure Container Registry
+
+**Decision**: Use Docker Hub for container image hosting instead of Azure Container Registry (ACR)
+
+**Rationale**:
+- **Cost Savings**: Eliminates ~$45/month ACR costs across environments
+- **Public Distribution**: Enables easy sharing and public access to the application
+- **Multi-Cloud Ready**: Simplifies deployment to non-Azure environments
+- **Standard Workflow**: Uses familiar Docker tooling and workflows
+- **Community Friendly**: Aligns with open-source distribution practices
+
+**Trade-offs**:
+- **External Dependency**: Relies on Docker Hub availability (mitigated by image caching)
+- **Public Visibility**: Images visible to public if using free tier (resolved with private repos)
+- **Rate Limiting**: Subject to Docker Hub pull limits (mitigated with Pro account or authentication)
 
 ## Components
 
@@ -146,7 +164,7 @@ The Time Tracker application is deployed to Microsoft Azure using a modern cloud
 
 **Web App Configuration**:
 - **Runtime**: Linux container
-- **Container Source**: Azure Container Registry
+- **Container Source**: Docker Hub (public or private repository)
 - **Identity**: System-assigned managed identity
 - **VNet Integration**: Connected to App Service subnet
 - **Health Check**: /health endpoint

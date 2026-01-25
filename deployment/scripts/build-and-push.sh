@@ -2,7 +2,7 @@
 set -e
 
 # ============================================================================
-# Build and Push Docker Image to Azure Container Registry
+# Build and Push Docker Image to Docker Hub
 # ============================================================================
 
 # Color codes
@@ -19,47 +19,49 @@ usage() {
     cat << EOF
 Usage: $0 [OPTIONS]
 
-Build Docker image and push to Azure Container Registry.
+Build Docker image and push to Docker Hub.
 
 OPTIONS:
-    -r, --resource-group    Resource group name [required]
-    -a, --acr-name         ACR name [optional, will auto-detect]
-    -t, --tag              Docker image tag (default: latest)
-    -p, --push-dockerhub   Also push to Docker Hub (requires DOCKERHUB_USERNAME)
-    -h, --help             Display this help message
+    -u, --dockerhub-username  Docker Hub username [required]
+    -r, --repository          Repository name (default: timetracker)
+    -t, --tag                 Docker image tag (default: latest)
+    -h, --help                Display this help message
+
+ENVIRONMENT VARIABLES:
+    DOCKERHUB_USERNAME       Docker Hub username
+    DOCKERHUB_PASSWORD       Docker Hub password or access token
+    DOCKERHUB_REPOSITORY     Docker Hub repository (default: timetracker)
 
 EXAMPLES:
-    # Build and push to ACR
-    $0 --resource-group rg-timetracker-dev
+    # Build and push to Docker Hub
+    $0 --dockerhub-username myuser --tag v1.0.0
 
-    # Build and push to both ACR and Docker Hub
-    $0 --resource-group rg-timetracker-prod --tag v1.0.0 --push-dockerhub
+    # Using environment variables
+    export DOCKERHUB_USERNAME=myuser
+    export DOCKERHUB_PASSWORD=mytoken
+    $0 --tag latest
 
 EOF
 }
 
-RESOURCE_GROUP=""
-ACR_NAME=""
+DOCKERHUB_USERNAME="${DOCKERHUB_USERNAME:-}"
+DOCKERHUB_PASSWORD="${DOCKERHUB_PASSWORD:-}"
+REPOSITORY="timetracker"
 IMAGE_TAG="latest"
-PUSH_DOCKERHUB=false
 
 while [[ $# -gt 0 ]]; do
     case $1 in
-        -r|--resource-group)
-            RESOURCE_GROUP="$2"
+        -u|--dockerhub-username)
+            DOCKERHUB_USERNAME="$2"
             shift 2
             ;;
-        -a|--acr-name)
-            ACR_NAME="$2"
+        -r|--repository)
+            REPOSITORY="$2"
             shift 2
             ;;
         -t|--tag)
             IMAGE_TAG="$2"
             shift 2
-            ;;
-        -p|--push-dockerhub)
-            PUSH_DOCKERHUB=true
-            shift
             ;;
         -h|--help)
             usage
@@ -73,8 +75,8 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-if [ -z "$RESOURCE_GROUP" ]; then
-    print_error "Resource group is required"
+if [ -z "$DOCKERHUB_USERNAME" ]; then
+    print_error "Docker Hub username is required"
     usage
     exit 1
 fi
@@ -83,64 +85,64 @@ fi
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 PROJECT_ROOT="$(dirname "$(dirname "$SCRIPT_DIR")")"
 
-print_info "Building and pushing Docker image..."
-print_info "Resource Group: ${RESOURCE_GROUP}"
+print_info "Building and pushing Docker image to Docker Hub..."
+print_info "Docker Hub Username: ${DOCKERHUB_USERNAME}"
+print_info "Repository: ${REPOSITORY}"
 print_info "Image Tag: ${IMAGE_TAG}"
 
-# Auto-detect ACR if not provided
-if [ -z "$ACR_NAME" ]; then
-    print_info "Auto-detecting Azure Container Registry..."
-    ACR_NAME=$(az acr list --resource-group "${RESOURCE_GROUP}" --query "[0].name" -o tsv)
-    
-    if [ -z "$ACR_NAME" ]; then
-        print_error "No ACR found in resource group ${RESOURCE_GROUP}"
-        exit 1
-    fi
+print_info "Docker Hub Username: ${DOCKERHUB_USERNAME}"
+print_info "Repository: ${REPOSITORY}"
+print_info "Image Tag: ${IMAGE_TAG}"
+
+# Login to Docker Hub
+print_info "Logging in to Docker Hub..."
+if [ -n "$DOCKERHUB_PASSWORD" ]; then
+    echo "$DOCKERHUB_PASSWORD" | docker login -u "${DOCKERHUB_USERNAME}" --password-stdin
+else
+    docker login -u "${DOCKERHUB_USERNAME}"
 fi
+print_success "Logged in to Docker Hub"
 
-ACR_LOGIN_SERVER=$(az acr show --name "${ACR_NAME}" --query loginServer -o tsv)
-print_info "Using ACR: ${ACR_NAME} (${ACR_LOGIN_SERVER})"
-
-# Login to ACR
-print_info "Logging in to Azure Container Registry..."
-az acr login --name "${ACR_NAME}"
-print_success "Logged in to ACR"
+# Determine which Dockerfile to use
+if [ -f "${PROJECT_ROOT}/deployment/docker/Dockerfile.production" ]; then
+    DOCKERFILE="${PROJECT_ROOT}/deployment/docker/Dockerfile.production"
+    print_info "Using production Dockerfile"
+elif [ -f "${PROJECT_ROOT}/Dockerfile" ]; then
+    DOCKERFILE="${PROJECT_ROOT}/Dockerfile"
+    print_info "Using root Dockerfile"
+else
+    print_error "No Dockerfile found"
+    exit 1
+fi
 
 # Build Docker image
 print_info "Building Docker image..."
+FULL_IMAGE_NAME="${DOCKERHUB_USERNAME}/${REPOSITORY}"
+
 docker build \
-    -t "${ACR_LOGIN_SERVER}/timetracker:${IMAGE_TAG}" \
-    -t "${ACR_LOGIN_SERVER}/timetracker:latest" \
-    -f "${PROJECT_ROOT}/Dockerfile" \
+    -t "${FULL_IMAGE_NAME}:${IMAGE_TAG}" \
+    -t "${FULL_IMAGE_NAME}:latest" \
+    -f "${DOCKERFILE}" \
     "${PROJECT_ROOT}"
 
 print_success "Docker image built successfully"
 
-# Push to ACR
-print_info "Pushing image to Azure Container Registry..."
-docker push "${ACR_LOGIN_SERVER}/timetracker:${IMAGE_TAG}"
-docker push "${ACR_LOGIN_SERVER}/timetracker:latest"
-print_success "Image pushed to ACR: ${ACR_LOGIN_SERVER}/timetracker:${IMAGE_TAG}"
+# Push to Docker Hub
+print_info "Pushing image to Docker Hub..."
+docker push "${FULL_IMAGE_NAME}:${IMAGE_TAG}"
 
-# Optionally push to Docker Hub
-if [ "$PUSH_DOCKERHUB" = true ]; then
-    if [ -z "$DOCKERHUB_USERNAME" ]; then
-        print_error "DOCKERHUB_USERNAME environment variable not set"
-        exit 1
-    fi
-    
-    print_info "Tagging image for Docker Hub..."
-    docker tag "${ACR_LOGIN_SERVER}/timetracker:${IMAGE_TAG}" "${DOCKERHUB_USERNAME}/timetracker:${IMAGE_TAG}"
-    docker tag "${ACR_LOGIN_SERVER}/timetracker:${IMAGE_TAG}" "${DOCKERHUB_USERNAME}/timetracker:latest"
-    
-    print_info "Logging in to Docker Hub..."
-    docker login
-    
-    print_info "Pushing to Docker Hub..."
-    docker push "${DOCKERHUB_USERNAME}/timetracker:${IMAGE_TAG}"
-    docker push "${DOCKERHUB_USERNAME}/timetracker:latest"
-    
-    print_success "Image pushed to Docker Hub: ${DOCKERHUB_USERNAME}/timetracker:${IMAGE_TAG}"
+# Only push latest if not a specific version tag
+if [ "${IMAGE_TAG}" != "latest" ]; then
+    docker push "${FULL_IMAGE_NAME}:latest"
+    print_success "Images pushed to Docker Hub:"
+    print_success "  - ${FULL_IMAGE_NAME}:${IMAGE_TAG}"
+    print_success "  - ${FULL_IMAGE_NAME}:latest"
+else
+    print_success "Image pushed to Docker Hub: ${FULL_IMAGE_NAME}:${IMAGE_TAG}"
 fi
 
 print_success "Build and push completed successfully!"
+print_info ""
+print_info "Next steps:"
+print_info "  1. Deploy to Azure: ./deployment/scripts/deploy.sh -e dev -t ${IMAGE_TAG}"
+print_info "  2. Or pull and run locally: docker pull ${FULL_IMAGE_NAME}:${IMAGE_TAG}"
