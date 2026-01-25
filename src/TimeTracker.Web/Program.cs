@@ -27,8 +27,7 @@ if (builder.Environment.IsProduction() || builder.Environment.IsStaging())
             keyVaultUri,
             new DefaultAzureCredential());
         
-        builder.Logging.AddConsole();
-        builder.Logging.LogInformation("Azure Key Vault configured: {KeyVaultUri}", keyVaultUri);
+        builder.Logging.AddConsole();        
     }
 }
 
