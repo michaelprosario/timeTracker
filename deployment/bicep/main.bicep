@@ -33,6 +33,9 @@ param postgresqlAdminPassword string
 @description('The Docker image tag to deploy')
 param dockerImageTag string = 'latest'
 
+@description('Deployment timestamp')
+param deploymentTimestamp string = utcNow()
+
 @description('Common tags to apply to all resources')
 param tags object = {
   Environment: environment
@@ -151,7 +154,7 @@ module appServiceModule 'modules/appservice.bicep' = {
     acrLoginServer: acrModule.outputs.acrLoginServer
     dockerImageName: 'timetracker:${dockerImageTag}'
     acrUsername: naming.acr
-    acrPassword: listCredentials(acrModule.outputs.acrId, '2023-07-01').passwords[0].value
+    acrPassword: acrModule.outputs.acrPassword
     subnetId: vnetModule.outputs.appServiceSubnetId
     appInsightsConnectionString: monitoringModule.outputs.appInsightsConnectionString
     tags: tags
@@ -187,7 +190,7 @@ resource postgresqlConnectionStringSecret 'Microsoft.KeyVault/vaults/secrets@202
   parent: keyVault
   name: 'ConnectionStrings--DefaultConnection'
   properties: {
-    value: postgresqlModule.outputs.connectionString
+    value: 'Host=${postgresqlModule.outputs.serverFqdn};Database=${postgresqlModule.outputs.databaseName};Username=${postgresqlAdminUsername};Password=${postgresqlAdminPassword};SSL Mode=Require;Trust Server Certificate=true'
     contentType: 'text/plain'
   }
 }
@@ -207,7 +210,7 @@ resource acrPasswordSecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = {
   parent: keyVault
   name: 'ACR--Password'
   properties: {
-    value: listCredentials(acrModule.outputs.acrId, '2023-07-01').passwords[0].value
+    value: acrModule.outputs.acrPassword
     contentType: 'text/plain'
   }
 }
@@ -280,5 +283,5 @@ output appInsightsConnectionString string = monitoringModule.outputs.appInsights
 output logAnalyticsWorkspaceName string = monitoringModule.outputs.workspaceName
 
 // Deployment Information
-output deploymentTimestamp string = utcNow()
+output deploymentTimestamp string = deploymentTimestamp
 output dockerImageTag string = dockerImageTag

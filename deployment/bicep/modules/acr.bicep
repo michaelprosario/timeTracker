@@ -46,3 +46,4 @@ resource containerRegistry 'Microsoft.ContainerRegistry/registries@2023-07-01' =
 output acrId string = containerRegistry.id
 output acrName string = containerRegistry.name
 output acrLoginServer string = containerRegistry.properties.loginServer
+output acrPassword string = listCredentials(containerRegistry.id, '2023-07-01').passwords[0].value

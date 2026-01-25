@@ -122,4 +122,5 @@ output serverId string = postgresqlServer.id
 output serverName string = postgresqlServer.name
 output serverFqdn string = postgresqlServer.properties.fullyQualifiedDomainName
 output databaseName string = database.name
-output connectionString string = 'Host=${postgresqlServer.properties.fullyQualifiedDomainName};Database=${databaseName};Username=${administratorLogin};Password=${administratorPassword};SSL Mode=Require;Trust Server Certificate=true'
+// Note: Connection string is built in main.bicep using secure parameters to avoid exposing secrets in outputs
+output connectionStringTemplate string = 'Host=${postgresqlServer.properties.fullyQualifiedDomainName};Database=${databaseName};Username={username};Password={password};SSL Mode=Require;Trust Server Certificate=true'
