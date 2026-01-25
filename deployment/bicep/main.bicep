@@ -82,7 +82,7 @@ var skuConfig = environment == 'prod' ? {
     name: 'Standard_B1ms'
     tier: 'Burstable'
   }
-  acr: 'Standard'
+  acr: 'Basic'
 }
 
 // ============================================================================
