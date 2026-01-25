@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 using TimeTracker.Core.Interfaces;
 using TimeTracker.Core.Services;
